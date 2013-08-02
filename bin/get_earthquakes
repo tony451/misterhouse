@@ -11,6 +11,8 @@
 #  Change log:
 #    - 01/22/2009 - Initial version based on original internet_earthquakes.pl
 #                   common code script written by Tim Doyle and David Norwood 
+#    - 31/07/2013 - Modified to cope with USGS change of data location and
+#                   format.  Now parses CSV data file fetched with wget. TY
 #
 #  This free software is licensed under the terms of the GNU public license.
 #
@@ -22,6 +24,9 @@
 
 
 use strict;
+use Text::CSV;
+use Date::Parse;
+use Time::Local;
 
 our ($Pgm_Path, $Pgm_Name);
 BEGIN {
@@ -60,7 +65,7 @@ main::read_mh_opts(\%config_parms, $Pgm_Path);
 
 use DB_File;
 use Math::Trig;
-use Time::Local;
+#use Time::Local;
 #use Data::Dumper;
 
 # Default Magnitude Thresholds
@@ -79,7 +84,8 @@ $Earthquake_Display = 'all' unless $Earthquake_Display;
 my $latitude = $config_parms{latitude}+0;
 my $longitude = $config_parms{longitude}+0;
 
-my $f_cnss_merged_txt = "$config_parms{data_dir}/web/earthquakes_cnss_14.txt";
+# my $f_cnss_merged_txt = "$config_parms{data_dir}/web/earthquakes_cnss_14.txt";
+my $f_earthquakes_csv = "$config_parms{data_dir}/web/all_day.csv";
 my $f_earthquakes_txt = "$config_parms{data_dir}/web/earthquakes.txt";
 my $f_earthquakes_gif = "$config_parms{data_dir}/web/earthquakes.gif";
 
@@ -96,16 +102,48 @@ if( $parms{d}) {
   die "Dumpped the DBM file.  Exiting!\n";
 }
 
-unlink $f_cnss_merged_txt;
-my $getURLcmd = 'net_ftp -passive 1 -command get -server hazards.cr.usgs.gov ';
-$getURLcmd .= ' -user anonymous -password anonymous';
-system($getURLcmd . " -file $f_cnss_merged_txt -file_remote cnss/cnss_14.fing ");
+# Declare array for receiving data
+my @txtFile;
 
-unless (open CNSS, $f_cnss_merged_txt) {
-    die "$Pgm_Name: Failed to retrieve file from USGS\n";
+# Delete download data file and fetch new version with wget.  NB now in csv format.
+unlink $f_earthquakes_csv;
+
+system("/usr/bin/wget -O $f_earthquakes_csv http://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.csv");
+
+# Declare new Text::CSV instance
+my $csv = Text::CSV->new({always_quote => 1,});
+
+open (my $CSV, "<", $f_earthquakes_csv) or die $!;
+
+
+#   Absorb first header line
+my $dummy=<$CSV>;
+
+# Parse csv earthquake data and map required fields to match original
+# programme spec.
+# Also original version used a sub parse_quake to massage data
+# not needed any more.
+
+while (my $fields = $csv->getline($CSV)) {
+       my $intime = $fields->[0];
+       my $qlat = $fields->[1];
+       my $qlong = $fields->[2];
+       my $qdept = $fields->[3];
+       my $qmagn  = $fields->[4];
+       my $qlocal = $fields->[13];
+       my $qsrc  = "TY";
+
+       my ($ss, $mm, $hh, $day, $month, $year, $zone) = strptime($intime);
+       $ss = int $ss;
+       my $qgmt = timegm($ss, $mm, $hh, $day, $month, $year);
+
+       $qdept += 0;
+       $qmagn += 0;
+       push(@txtFile, [$qgmt, $qlat, $qlong, $qdept, $qmagn, $qsrc, $qlocal]);
+
 }
-my @txtFile = <CNSS>;
-close CNSS;
+close $CSV;
+
 print("$Pgm_Name: read " . scalar(@txtFile) . " entries\n") if $parms{v};
 
 
@@ -119,7 +157,7 @@ foreach $line (@txtFile) {
   
 #  print("$Pgm_Name: considering event -> $line") if $parms{v};
 
-  if( $event = parse_quake($line)) {
+  if( $event = ($line)) {
     $key = join(':', @{$event}[0..2]);
 
 #  print "\$key: " . $key . "\n"; 
@@ -182,14 +220,14 @@ foreach $line (@txtFile) {
 #calculate the image file name for the first new entry
 #  0   1   2    3      4        5      6         7       8     9
 #[gmt,lat,lon,depth,magnitude,source,location,distance,speak,spoken]
-if($keyNewest ne "") {
-  @dbmEvent = split( $; , $DBM{$keyNewest});
-  my $long_reso = abs(5 * round($dbmEvent[1]/5)) > 45 ? (abs(5 * round($dbmEvent[1]/5)) > 65 ? 20 : 10) : 5;
-  my $image = 'http://earthquake.usgs.gov/recenteqsww/Maps/10/' . $long_reso * round(($dbmEvent[2] < 0 ? 360 + $dbmEvent[2] : $dbmEvent[2])/$long_reso) . '_' . 5 * round($dbmEvent[1]/5) . '.gif';
-  unlink $f_earthquakes_gif;
-  $getURLcmd = "get_url " . ($parms{v} ? "" : "-quiet");
-  system($getURLcmd . " $image $f_earthquakes_gif");
-}
+#if($keyNewest ne "") {
+#  @dbmEvent = split( $; , $DBM{$keyNewest});
+#  my $long_reso = abs(5 * round($dbmEvent[1]/5)) > 45 ? (abs(5 * round($dbmEvent[1]/5)) > 65 ? 20 : 10) : 5;
+#  my $image = 'http://earthquake.usgs.gov/recenteqsww/Maps/10/' . $long_reso * round(($dbmEvent[2] < 0 ? 360 + $dbmEvent[2] : $dbmEvent[2])/$long_reso) . '_' . 5 * round($dbmEvent[1]/5) . '.gif';
+#  unlink $f_earthquakes_gif;
+#  $getURLcmd = "get_url " . ($parms{v} ? "" : "-quiet");
+#  system($getURLcmd . " $image $f_earthquakes_gif");
+#}
 
 #Purge entries not in %DBMsync
 my @keysOld = grep{!exists($DBMsync{$_})} keys(%DBM);
@@ -231,7 +269,7 @@ if( $Earthquake_Display eq "all") {
 
 
 print( TXT "The full Bulletin is available via the Internet at:\n");
-print( TXT "ftp://hazards.cr.usgs.gov/cnss/cnss_14.fing\n\n");
+print( TXT "http://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.csv\n\n");
 print( TXT "Updated as of " . scalar(localtime()) . ".\n\n");
 print( TXT "  DATE-(UTC)-TIME     LAT    LON     DEP   MAG     COMMENTS\n");
 print( TXT "yyyy/mm/dd hh:mm:ss   deg.   deg.     km\n");   
@@ -258,52 +296,6 @@ close TXT;
 untie %DBM;
 exit;
 
-
-
-sub parse_quake {
-  my ($line) = @_;
-
-#   GMT                lat     lon   depth mag   source  location
-#2009/02/11 01:23:56  34.02N 117.24W  12.6 1.6      CI: GREATER LOS ANGELES AREA, CALIF.
-#2009/01/04 21:57:49  33.98N 116.78W  16.7 1.5      CI: SOUTHERN CALIFORNIA
-#
-#  0   1   2    3      4        5      6         7       8     9
-#[gmt,lat,lon,depth,magnitude,source,location,distance,speak,spoken]
-
-  if (my ($qdate, $qtime, $qlatd, $qnoso, $qlong, $qeawe, $qdept, $qmagn, $qsrc, $qloca) =
-      $line =~ m!^(.{10})\s(.{8})\s(.{6})([NS])\s(.{6})([EW])\s(.{5})\s(.{3})\s(.{7}):\s(.+)! ) {
-
-    #convert timestamp to gmt
-    my ($qyear, $qmnth, $qday) = $qdate =~ m!(\S+)/(\S+)/(\S+)!;
-    my ($qhour, $qminu, $qseco) = $qtime =~ m!(\S+):(\S+):(\S+)!;
-    my $qgmt;
-    eval {
-      $qgmt = timegm($qseco,$qminu,$qhour,$qday,$qmnth-1,$qyear);
-    };
-    if ($@) {
-      print("$Pgm_Name: timegm() failed to parse date and time\n") if $parms{v};
-      return 0;    #failed to parse
-    }
-    
-    #Normalize lat and lon
-    $qlatd += 0; $qlong += 0;
-    $qlatd *= -1 if ( $qnoso eq "S" );
-    $qlong *= -1 if ( $qeawe eq "W" );
-    
-    #Make sure the magnitued and depth are a number
-    $qdept +=0; $qmagn +=0;
-    
-    #Trim leading and trailing spaces if any
-    $qsrc =~ s/^\s+//; $qloca =~ s/^\s+//;
-    $qsrc =~ s/\s+$//; $qloca =~ s/\s+$//;
-    
-    #          0       1       2      3       4       5      6
-    return( [$qgmt, $qlatd, $qlong, $qdept, $qmagn, $qsrc, $qloca]);
-  } else {
-    print("$Pgm_Name: Line does not match expected format\n") if $parms{v};
-    return 0;
-  }
-}
 
 
 sub calc_distance {
