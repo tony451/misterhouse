@@ -8,6 +8,7 @@ Info available at: http://home.earthlink.net/~jrhees/USBUIRT/index.htm
 03/26/2003	Created by David Norwood (dnorwood2@yahoo.com)
 10/15/2003  Brian G. Ujvary and David Norwood added support for the Windows DLL driver
 08/04/2005	fixed problem sending 0, sending two part raw codes 
+06/06/2010  TY modified to support proxy uirt
 
 
 To enable this module, add these entries to your .ini file:
@@ -440,6 +441,8 @@ sub get_gpiocaps {
 
 sub get_response {
 	my $length = shift;
+# TY Hack for proxy
+        return 0 if $main::Serial_Ports{USB_UIRT}{object} eq 'proxy';
 	$length = 1 unless $length; 
 	select undef, undef, undef, .01;
 	my ($count, $ret) = $main::Serial_Ports{USB_UIRT}{object}->read($length);
@@ -566,6 +569,8 @@ sub usb_uirt_send {
 	push @bytes, $checksum;
 	$hex .= sprintf '%02x', $checksum;
 	print "USB_UIRT sending $hex\n";
+# TY hack for proxy
+        return if &main::proxy_send('USB_UIRT', 'usb_uirt_send', @bytes);
 	$main::Serial_Ports{USB_UIRT}{object}->dtr_active(0);
 	$main::Serial_Ports{USB_UIRT}{object}->write(pack 'C*', @bytes);
 }

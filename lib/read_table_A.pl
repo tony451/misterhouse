@@ -9,12 +9,13 @@ use strict;
 #X10I,           J1,                     Outside_Front_Light_Coaches,            Outside|Front|Light|NightLighting
 #
 # See mh/code/test/test.mht for an example.
+# Modified TY to add VERA_DEV Feb 2013
 #
 
 
 #print_log "Using read_table_A.pl";
 
-my (%groups, %objects, %packages, %addresses);
+my (%groups, %objects, %packages);
 
 sub read_table_init_A {
                                 # reset known groups
@@ -22,7 +23,6 @@ sub read_table_init_A {
 	%groups=();
 	%objects=();
 	%packages=();
-        %addresses=();
 }
 
 sub read_table_A {
@@ -33,12 +33,18 @@ sub read_table_A {
     }
     $record =~ s/\s*#.*$//;
 
-    my ($code, $address, $name, $object, $grouplist, $comparison, $limit, @other, $other, $vcommand, $occupancy,$network,$password, $interface);
+    my ($code, $address, $name, $object, $grouplist, $comparison, $limit, @other, $other, $vcommand, $occupancy,$network,$password);
     my(@item_info) = split(',\s*', $record);
     my $type = uc shift @item_info;
 
+    if($type eq "VERA_DEV") {
+        require 'Vera_Item.pm';
+        ($address, $name, $grouplist, @other) = @item_info;
+        $other = join ', ', (map {"'$_'"} @other); # Quote data
+        $object = "Vera_Item('$address', $other)";
+    }
     # -[ ZWave ]----------------------------------------------------------
-    if($type eq "ZWAVE_LIGHT") {
+    elsif($type eq "ZWAVE_LIGHT") {
         require 'ZWave_Items.pm';
         require 'ZWave_RZC0P.pm';
         ($address, $name, $grouplist, @other) = @item_info;
@@ -85,93 +91,39 @@ sub read_table_A {
     }
     # ----------------------------------------------------------------------
     elsif($type eq "INSTEON_PLM") {
-        require Insteon_PLM;
+        require 'Insteon_PLM.pm';
         ($name, $grouplist, @other) = @item_info;
         $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon_PLM('Insteon_PLM',$other)";
+        $object = "Insteon_PLM('Insteon_PLM')";
     }
-    elsif($type eq "INSTEON_LAMPLINC") {
-        require Insteon::Lighting;
-        ($address, $name, $grouplist, @other) = @item_info;
+    elsif($type eq "IPLD") {
+        require 'Insteon_Device.pm';
+        ($address, $name, $grouplist, $object, @other) = @item_info;
         $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::LampLinc(\'$address\',$other)";
+        $object = "Insteon_Device(\$$object, \'$address\', $other)";
     }
-    elsif($type eq "INSTEON_APPLIANCELINC") {
-        require Insteon::Lighting;
-        ($address, $name, $grouplist, @other) = @item_info;
-        $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::ApplianceLinc(\'$address\',$other)";
-    }
-    elsif($type eq "INSTEON_SWITCHLINC") {
-        require Insteon::Lighting;
-        ($address, $name, $grouplist, @other) = @item_info;
-        $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::SwitchLinc(\'$address\',$other)";
-    }
-    elsif($type eq "INSTEON_SWITCHLINCRELAY") {
-        require Insteon::Lighting;
-        ($address, $name, $grouplist, @other) = @item_info;
-        $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::SwitchLincRelay(\'$address\',$other)";
-    }
-    elsif($type eq "INSTEON_KEYPADLINC") {
-        require Insteon::Lighting;
-        ($address, $name, $grouplist, @other) = @item_info;
-        $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::KeyPadLinc(\'$address\', $other)";
-    }
-    elsif($type eq "INSTEON_KEYPADLINCRELAY") {
-        require Insteon::Lighting;
-        ($address, $name, $grouplist, @other) = @item_info;
-        $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::KeyPadLincRelay(\'$address\', $other)";
-    }
-    elsif($type eq "INSTEON_REMOTELINC") {
-        require Insteon::Controller;
-        ($address, $name, $grouplist, @other) = @item_info;
-        $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::RemoteLinc(\'$address\', $other)";
-    }
-    elsif($type eq "INSTEON_MOTIONSENSOR") {
-        require Insteon::Security;
-        ($address, $name, $grouplist, @other) = @item_info;
-        $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::MotionSensor(\'$address\', $other)";
-    }
-    elsif($type eq "INSTEON_IOLINC") {
-        require Insteon::IOLinc;
-        ($address, $name, $grouplist, @other) = @item_info;
-        $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::IOLinc(\'$address\', $other)";
-    }
-    elsif($type eq "INSTEON_FANLINC") {
-        require Insteon::Lighting;
-        ($address, $name, $grouplist, @other) = @item_info;
-        $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::FanLinc(\'$address\', $other)";
-    }
-    elsif($type eq "INSTEON_ICONTROLLER") {
-        require Insteon::BaseInsteon;
-        ($address, $name, $grouplist, @other) = @item_info;
+    elsif($type eq "IPLL") {
+        require 'Insteon_Link.pm';
+        ($address, $name, $grouplist, $object, @other) = @item_info;
         $other = join ', ', (map {"'$_'"} @other); # Quote data
         my ($deviceid,$groupid) = $address =~ /(\S+):(\S+)/;
-        if ($groupid) {
-           $object = "Insteon::InterfaceController(\'00.00.00:$groupid\', $other)";
+        if ($deviceid =~ /$object/i) {
+           $object = "Insteon_Link(\$$object, \'00.00.00:$groupid\', $other)";
         } else {
-           $object = "Insteon::InterfaceController(\'00.00.00:$address\', $other)";
+           $object = "Insteon_Link(\$$object, \'$address\', $other)";
         }
     }
-    elsif($type eq 'IPLT' or $type eq 'INSTEON_THERMOSTAT') {
+    elsif($type eq 'IPLT') {
         require 'Insteon_Thermostat.pm';
         ($address, $name, $grouplist, $object, @other) = @item_info;
         $other = join ', ', (map {"'$_'"} @other); # Quote data
         $object = "Insteon_Thermostat(\$$object, \'$address\', $other)";
     }
     elsif($type eq "INSTEON_IRRIGATION") {
-        require Insteon::Irrigation;
-        ($address, $name, $grouplist, @other) = @item_info;
+        require 'Insteon_Irrigation.pm';
+        ($address, $name, $grouplist, $object, @other) = @item_info;
         $other = join ', ', (map {"'$_'"} @other); # Quote data
-        $object = "Insteon::Irrigation(\'$address\', $other)";
+        $object = "Insteon_Irrigation(\$$object, \'$address\', $other)";
     }
     # ----------------------------------------------------------------------
     elsif($type eq 'FROG') {
@@ -765,19 +717,6 @@ sub read_table_A {
             $code .= "use xPL_Items;\n";
         }
     }
-     elsif($type eq "XPL_X10BASIC") {
-       ($address, $name, $grouplist, @other) = @item_info;
-       $other = join ', ', (map {"'$_'"} @other); # Quote data
-       if($other){
-           $object = "xPL_X10Basic('$address',$other)";
-       }
-       else{
-           $object = "xPL_X10Basic('$address')";
-       }
-       if( ! $packages{xPL_X10Basic}++ ) {   # first time for this objecttype?
-           $code .= "use xPL_X10Basic;\n";
-       }
-   }
     elsif($type eq "XPL_IRRIGATEWAY") {
         ($address, $name, $grouplist, @other) = @item_info;
         $other = join ', ', (map {"'$_'"} @other); # Quote data
@@ -868,7 +807,7 @@ sub read_table_A {
         if( ! $packages{xPL_Plugwise}++ ) {   # first time for this object type?
             $code .= "use xPL_Plugwise;\n";
         }
-    }
+    }    
     elsif($type eq "XPL_SQUEEZEBOX") {
         ($address, $name, $grouplist, @other) = @item_info;
         $other = join ', ', (map {"'$_'"} @other); # Quote data
@@ -987,25 +926,10 @@ sub read_table_A {
               $code .= sprintf "\$%-35s -> add(\$%s);\n", $scene_name, $name;
            }
         } else {
-           print "\nThere is no object called $scene_name defined.  Ignoring SCENE_MEMBER entry.\n" unless $objects{$scene_name};
-           print "\nThere is no object called $name defined.  Ignoring SCENE_MEMBER entry.\n" unless $objects{$name};
+           print "\nThere is no object called $scene_name defined.  Ignoring SCENE_MEMBER entry.\n";
         }
         $object = '';
-    }
-    elsif ($type eq "PHILIPS_HUE"){
-    	($address, $name, $grouplist, @other) = @item_info;
-    	$other = join ', ', (map {"'$_'"} @other); # Quote data
-        if($other){
-            $object = "Philips_Hue('$address',$other)";
-        }
-        else{
-            $object = "Philips_Hue('$address')";
-        }
-        if( ! $packages{Philips_Hue}++ ) {   # first time for this object type?
-            $code .= "use Philips_Hue;\n";
-        }
-    }
-    else {
+    } else {
         print "\nUnrecognized .mht entry: $record\n";
         return;
     }

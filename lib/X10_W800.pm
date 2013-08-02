@@ -30,6 +30,7 @@ back out to the powerline, use mh/code/common/x10_rf_relay.pl.
 
 Also see X10_MR26.pm for a similar interface.
 
+TY NB added a number of  if $main::Debug{w800} to reduce logging of stuff caused by non X10 RF
 =cut
 
 use strict;
@@ -63,7 +64,7 @@ sub check_for_data {
     unless ($main::Serial_Ports{W800}{data}) {
        if ($prev_bad_checksums != 0 and !($prev_residual)) {
            &::print_log(  "W800: failed to recover from bad checksums due to no data"
-               . "(count=$prev_bad_checksums)");
+               . "(count=$prev_bad_checksums)") if $main::Debug{w800};
            $prev_bad_checksums = 0;
         }
 
@@ -95,13 +96,15 @@ sub check_for_data {
        # data from a corrupt data stream.
        # NOTE: get_tickcount wraps, so $time < $new_data_time test is to
        #       make sure that doesn't become a problem.
+       # Patch TY from emails.
+       # if (&X10_W800::is_within_timeout($time, $new_data_time, 2000)) {
        if (not &X10_W800::is_within_timeout($time, $new_data_time, 2000)) {
           my $hex = unpack "H*", $main::Serial_Ports{W800}{data};
           &::print_log("W800: flushing incomplete data: $hex") if $main::Debug{w800};
 
           if ($prev_bad_checksums != 0) {
              &::print_log(  "W800: failed to recover from bad checksums "
-                 . "(count=$prev_bad_checksums)");
+                 . "(count=$prev_bad_checksums)") if $main::Debug{w800};
              $prev_bad_checksums = 0;
           }
 
@@ -126,6 +129,8 @@ sub check_for_data {
       # Data gets sent multiple times
       #  - Check time
       #  - Process data only on the 2nd occurance, to avoid noise (seems essential)
+      # HACK TY changed threshhold from 1 to 0 and later back again.
+
       my $duplicate_threshold = 1; # 2nd occurance; set to 0 to omit duplicate check
       if (&X10_W800::duplicate_count($data) == $duplicate_threshold) {
 
@@ -153,7 +158,7 @@ sub check_for_data {
          if ($state eq 'BADCHECKSUM') {
 
              if ($prev_bad_checksums == 0) {
-                &::print_log("W800: bad checksum (attempting to recover)");
+                &::print_log("W800: bad checksum (attempting to recover)") if $main::Debug{w800};
              }
              $prev_bad_checksums++;
              $data = substr($data,1) if length($data) > 1;
@@ -164,7 +169,7 @@ sub check_for_data {
              # Report if we recovered from previous bad checksums.
              if ($prev_bad_checksums != 0) {
                 &::print_log(  "W800: recovered from bad checksum "
-                    . "(count=$prev_bad_checksums)");
+                    . "(count=$prev_bad_checksums)")  if $main::Debug{w800};
              }
              # reset bad checksum counter since this one is ok
              $prev_bad_checksums = 0;
