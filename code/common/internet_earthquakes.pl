@@ -36,6 +36,7 @@
 =begin comment
 
 code/common/internet_quakes.pl, bin/get_earthquakes
+ 1.7 Removed spoken 'near' and logic to account for changed data from USGS
  1.6 Changed spoken quake count logic so that quakes exceeding the 
      spoken limit will still be marked spoken.  Otherwise each hour
      the remainder will be spoken.  It is possible for the old logic
