@@ -370,9 +370,11 @@ sub speak_text {
                 $parms{rate}   = '+50%'  if $parms{rate}   eq 'fast';
                 $parms{volume} = 'quiet' if $parms{volume} eq 'soft';
                               # Does this need to be scaled from 0->100 to ???
-                if ($parms{volume}) {
-                    $text = qq[<VOLUME LEVEL="$parms{volume}"> $text </VOLUME>];
-                }
+#       TY Hack Commented out volume section to cure festival distortion problem August 2013
+#                if ($parms{volume}) {
+#                    $text = qq[<VOLUME LEVEL="$parms{volume}"> $text </VOLUME>];
+#                }
+
                 if ($parms{rate}) {
                     $text = qq[<RATE SPEED="$parms{rate}"> $text </RATE>];
                 }
@@ -390,6 +392,7 @@ sub speak_text {
 		    return; # the child will look after the real work
 		}
 	    }
+# TY Hack for debugging keep the text file    system("($main::config_parms{voice_text_festival} --tts $file) &");
             system("($main::config_parms{voice_text_festival} --tts $file ; rm $file) &");
 
 	    # Send voice text to waiting web clients
