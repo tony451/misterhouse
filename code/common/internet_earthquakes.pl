@@ -197,7 +197,7 @@ sub earthquake_read {
       $speech .= &calc_earthquake_age($dbmEvent[0]) 
           . " a magnitude " . $dbmEvent[4] . " earthquake occurred "
           . $dbmEvent[7] . " $Earthquake_Unit_Name away " 
-          . (($qloca =~ /^near/i)?'':'near ') . "$qloca. ";
+          . "$qloca. ";
     }
     
     #Update the spoken flag
