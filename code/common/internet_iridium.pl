@@ -7,6 +7,8 @@
 #@ in your mh.private.ini file.  Optionally set a mh.ini
 #@ iridium_brightness parm to limit announcments of only the brigher flares.
 
+# Modified to update URL  and TZ Jul 2013 TY
+#
 =begin comment
 
 There are 66 or so (defunct) Iridium communications satellites that that
@@ -39,8 +41,9 @@ sub uninstall_internet_iridium {
                                 # so use UCT (GMT+0) and translate.
 my $iridium_check_e = "$Code_Dirs[0]/iridium_check_events.pl";
 my $iridium_check_f = "$config_parms{data_dir}/web/iridium.html";
-my $iridium_check_u = "http://www.heavens-above.com/iridium.asp?" .
-"lat=$config_parms{latitude}&lng=$config_parms{longitude}&alt=0&TZ=UCT&Dur=7&" .
+# my $iridium_check_u = "http://www.heavens-above.com/iridium.asp?" .
+my $iridium_check_u = "http://www.heavens-above.com/IridiumFlares.aspx?" .
+"lat=$config_parms{latitude}&lng=$config_parms{longitude}&alt=0&TZ=GMT&Dur=7&" .
 "loc=$config_parms{city}";
 $p_iridium_check = new Process_Item qq[get_url "$iridium_check_u" "$iridium_check_f"];
 
