@@ -10,6 +10,7 @@ use strict;
 #
 # See mh/code/test/test.mht for an example.
 # Modified TY to add VERA_DEV Feb 2013
+# Modified TY to add RAZB_DEV Oct 2013
 #
 
 
@@ -33,15 +34,24 @@ sub read_table_A {
     }
     $record =~ s/\s*#.*$//;
 
-    my ($code, $address, $name, $object, $grouplist, $comparison, $limit, @other, $other, $vcommand, $occupancy,$network,$password);
+    my ($code, $address, $name, $object, $grouplist, $comparison, $limit, @other, $other, $vcommand, $occupancy,$network,$password, $deviceid, $instance);
     my(@item_info) = split(',\s*', $record);
     my $type = uc shift @item_info;
 
+    # -[ Veralite ZWave ]------------------------------------------------
     if($type eq "VERA_DEV") {
         require 'Vera_Item.pm';
         ($address, $name, $grouplist, @other) = @item_info;
         $other = join ', ', (map {"'$_'"} @other); # Quote data
         $object = "Vera_Item('$address', $other)";
+    }
+    # -[ Razberry Pi ZWave ]---------------------------------------------
+    elsif($type eq "RAZB_DEV") {
+        require 'Razb_Item.pm';
+        ($address, $name, $grouplist, $deviceid, $instance, @other) = @item_info;
+        $other = join ', ', (map {"'$_'"} @other); # Quote data
+        print "Razb Pi data: address=$address name=$name grouplist=$grouplist deviceid=$deviceid instance=$instance\n" if $::Debug{rasp};
+        $object = "Razb_Item('$address', '$deviceid', '$instance', $other)";
     }
     # -[ ZWave ]----------------------------------------------------------
     elsif($type eq "ZWAVE_LIGHT") {
